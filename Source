@@ -1,7 +1,7 @@
 --[[
 	NeverRage UI Library  (Roblox / Luau)
 
-	local Window  = NeverRage:CreateWindow({Title="Never", TitleAccent="Rage", Tag="v1.0", Footer="", Accent=Color3, ToggleKey=Enum.KeyCode, Scale=1.3})
+	local Window  = NeverRage:CreateWindow({Title="Never", TitleAccent="Rage", Tag="v1.0", Footer="", Accent=Color3, ToggleKey=Enum.KeyCode, Scale=1.3, MobileButton=true, ButtonText=nil, Logo="rbxassetid://...", Loading=true, LoadTime=1.4})
 	Window:AddCategory("Name")                                  -- small grey heading in the sidebar
 	local Tab     = Window:AddTab({Name="", Icon="crosshair", Description=""})
 	local Section = Tab:AddSection({Name="", Side="Left"|"Right"})
@@ -305,7 +305,7 @@ function NeverRage:CreateWindow(cfg)
 	if cfg.Accent then Theme.Accent = cfg.Accent end
 	local W, H, TH, SW = 680, 430, 36, 122
 
-	local Window = { Tabs = {}, Active = nil, ToggleKey = cfg.ToggleKey or Enum.KeyCode.RightShift }
+	local Window = { Tabs = {}, Active = nil, ToggleKey = cfg.ToggleKey or Enum.KeyCode.RightShift, Loaded = (cfg.Loading == false) }
 	local conns = {}
 	local function conn(sig, fn) conns[#conns + 1] = sig:Connect(fn) end
 
@@ -319,7 +319,7 @@ function NeverRage:CreateWindow(cfg)
 
 	local main = New("Frame", {
 		Name = "Main", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.fromOffset(W, H), BackgroundColor3 = Theme.Window, BorderSizePixel = 0, ClipsDescendants = true, Parent = gui,
+		Size = UDim2.fromOffset(W, H), BackgroundColor3 = Theme.Window, BorderSizePixel = 0, ClipsDescendants = true, Visible = false, Parent = gui,
 	}, { Corner(4), Stroke(Theme.Border) })
 	local uiScale = New("UIScale", { Scale = baseScale, Parent = main })
 
@@ -356,6 +356,8 @@ function NeverRage:CreateWindow(cfg)
 		{ New("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, SortOrder = Enum.SortOrder.LayoutOrder }) })
 	local minimized, maximized = false, false
 	local floatBtn
+	local bigScale = math.min(baseScale * 1.25, vp.X * 0.97 / W, vp.Y * 0.97 / H)
+	local function curScale() return maximized and bigScale or baseScale end
 	local function winButton(kind, order, hover, fn)
 		local b = New("TextButton", { Size = UDim2.fromOffset(26, TH - 1), BackgroundTransparency = 1, Text = "", AutoButtonColor = false, LayoutOrder = order, Parent = btns })
 		local g = Glyph(kind, b, 8, Theme.SubText, 9, 14)
@@ -396,13 +398,20 @@ function NeverRage:CreateWindow(cfg)
 
 	winButton("minimize", 0, Theme.Text, function()
 		minimized = not minimized
-		sidebar.Visible = not minimized
-		content.Visible = not minimized
-		main.Size = UDim2.fromOffset(W, minimized and TH or H)
+		if minimized then
+			sidebar.Visible = false
+			content.Visible = false
+			Tween(main, { Size = UDim2.fromOffset(W, TH) }, 0.16)
+		else
+			Tween(main, { Size = UDim2.fromOffset(W, H) }, 0.16)
+			task.delay(0.12, function()
+				if not minimized then sidebar.Visible = true; content.Visible = true end
+			end)
+		end
 	end)
 	winButton("maximize", 1, Theme.Text, function()
 		maximized = not maximized
-		uiScale.Scale = maximized and math.min(baseScale * 1.25, vp.X * 0.97 / W, vp.Y * 0.97 / H) or baseScale
+		Tween(uiScale, { Scale = curScale() }, 0.2)
 	end)
 	winButton("close", 2, Theme.Accent, function()
 		if floatBtn then Window:Toggle() else Window:Destroy() end
@@ -413,6 +422,13 @@ function NeverRage:CreateWindow(cfg)
 		{ New("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder, VerticalAlignment = Enum.VerticalAlignment.Bottom, HorizontalAlignment = Enum.HorizontalAlignment.Right }) })
 
 	function Window:Notify(n)
+		if not Window.Loaded then
+			task.spawn(function()
+				while not Window.Loaded and gui.Parent do task.wait(0.1) end
+				if gui.Parent then Window:Notify(n) end
+			end)
+			return
+		end
 		if type(n) == "string" then n = { Text = n } end
 		n = n or {}
 		local t = New("CanvasGroup", { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundColor3 = Theme.Element, BorderSizePixel = 0, GroupTransparency = 1, Parent = toasts }, { Corner(4), Stroke() })
@@ -430,18 +446,28 @@ function NeverRage:CreateWindow(cfg)
 		end)
 	end
 
-	-- floating toggle button (auto-enabled on touch devices; MobileButton=true/false to force)
+	-- floating toggle pill (auto-enabled on touch devices; MobileButton=true/false to force)
 	if cfg.MobileButton == true or (cfg.MobileButton == nil and UIS.TouchEnabled) then
 		floatBtn = New("TextButton", {
-			Name = "ToggleButton", Size = UDim2.fromOffset(42, 42), Position = UDim2.new(0, 14, 0.5, -21),
+			Name = "ToggleButton", Size = UDim2.new(0, 0, 0, 34), AutomaticSize = Enum.AutomaticSize.X,
+			AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 12, 0.5, 0),
 			BackgroundColor3 = Theme.Element, Text = "", AutoButtonColor = false, ZIndex = 20, Parent = gui,
-		}, { Corner(21) })
-		local fstroke = Stroke(Theme.Accent, 1.5); fstroke.Parent = floatBtn
-		local fletter = Label({
-			Size = UDim2.fromScale(1, 1), Text = cfg.ButtonText or string.sub(cfg.Title or "N", 1, 1), Font = Theme.FontBold,
-			TextSize = 17, TextColor3 = Theme.Accent, TextXAlignment = Enum.TextXAlignment.Center, ZIndex = 21, Parent = floatBtn,
+		}, {
+			Corner(17), Pad(8, 0, 14, 0),
+			New("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 7), VerticalAlignment = Enum.VerticalAlignment.Center, SortOrder = Enum.SortOrder.LayoutOrder }),
 		})
-		OnAccent(function() fstroke.Color = Theme.Accent; fletter.TextColor3 = Theme.Accent end)
+		local fstroke = Stroke(Theme.Border, 1.2); fstroke.Parent = floatBtn
+		New("ImageLabel", {
+			Size = UDim2.fromOffset(22, 22), BackgroundTransparency = 1, Image = cfg.Logo or "rbxassetid://127179358842282",
+			ScaleType = Enum.ScaleType.Fit, LayoutOrder = 0, ZIndex = 21, Parent = floatBtn,
+		})
+		local fname = Label({
+			Size = UDim2.new(0, 0, 1, 0), AutomaticSize = Enum.AutomaticSize.X, RichText = true,
+			Text = cfg.ButtonText or titleText(), Font = Theme.FontBold, TextSize = 12, LayoutOrder = 1, ZIndex = 21, Parent = floatBtn,
+		})
+		OnAccent(function() if not cfg.ButtonText then fname.Text = titleText() end end)
+		floatBtn.MouseEnter:Connect(function() Tween(floatBtn, { BackgroundColor3 = Theme.Element2 }); Tween(fstroke, { Color = Theme.Accent }) end)
+		floatBtn.MouseLeave:Connect(function() Tween(floatBtn, { BackgroundColor3 = Theme.Element }); Tween(fstroke, { Color = Theme.Border }) end)
 
 		local fdrag, moved, fstart, fpos = false, false, nil, nil
 		floatBtn.InputBegan:Connect(function(i)
@@ -472,8 +498,24 @@ function NeverRage:CreateWindow(cfg)
 		if i.KeyCode == Window.ToggleKey then Window:Toggle() end
 	end)
 
-	function Window:SetVisible(v) main.Visible = v end
-	function Window:Toggle() main.Visible = not main.Visible end
+	local shown = false
+	function Window:SetVisible(v)
+		if v == shown then return end
+		shown = v
+		if v then
+			main.Visible = true
+			uiScale.Scale = curScale() * 0.94
+			Tween(uiScale, { Scale = curScale() }, 0.2)
+		else
+			Tween(uiScale, { Scale = curScale() * 0.94 }, 0.15)
+			task.delay(0.16, function() if not shown then main.Visible = false end end)
+		end
+	end
+	function Window:IsVisible() return shown end
+	function Window:Toggle()
+		if not Window.Loaded then return end
+		Window:SetVisible(not shown)
+	end
 	function Window:SetToggleKey(k) Window.ToggleKey = k end
 	function Window:Destroy()
 		for _, c in ipairs(conns) do c:Disconnect() end
@@ -491,6 +533,57 @@ function NeverRage:CreateWindow(cfg)
 		if Window.Active then Window:SelectTab(Window.Active) end
 	end)
 
+	-- loading splash
+	if cfg.Loading ~= false then
+		local splash = New("CanvasGroup", {
+			AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(250, 124),
+			BackgroundColor3 = Theme.Window, BorderSizePixel = 0, GroupTransparency = 1, ZIndex = 50, Parent = gui,
+		}, { Corner(6), Stroke(Theme.Border) })
+		New("UIScale", { Scale = math.min(1.25, baseScale), Parent = splash })
+		local sbar = New("Frame", { Size = UDim2.new(1, 0, 0, 2), BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0, Parent = splash })
+		New("UIGradient", {
+			Color = ColorSequence.new({
+				ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255, 70, 110)),
+				ColorSequenceKeypoint.new(0.22, Color3.fromRGB(255, 190, 50)),
+				ColorSequenceKeypoint.new(0.42, Color3.fromRGB(90, 235, 120)),
+				ColorSequenceKeypoint.new(0.62, Color3.fromRGB(60, 190, 255)),
+				ColorSequenceKeypoint.new(0.82, Color3.fromRGB(150, 90, 255)),
+				ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255, 70, 200)),
+			}),
+			Parent = sbar,
+		})
+		New("ImageLabel", {
+			AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 16), Size = UDim2.fromOffset(34, 34),
+			BackgroundTransparency = 1, Image = cfg.Logo or "rbxassetid://127179358842282", ScaleType = Enum.ScaleType.Fit, Parent = splash,
+		})
+		local stitle = Label({ Size = UDim2.new(1, 0, 0, 18), Position = UDim2.fromOffset(0, 56), RichText = true, Text = titleText(), Font = Theme.FontBold, TextSize = 15, TextXAlignment = Enum.TextXAlignment.Center, Parent = splash })
+		local status = Label({ Size = UDim2.new(1, 0, 0, 12), Position = UDim2.fromOffset(0, 78), Text = "", TextSize = 8, TextColor3 = Theme.SubText, TextXAlignment = Enum.TextXAlignment.Center, Parent = splash })
+		local track = New("Frame", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 100), Size = UDim2.fromOffset(190, 3), BackgroundColor3 = Theme.Track, BorderSizePixel = 0, Parent = splash }, { Corner(2) })
+		local fill = New("Frame", { Size = UDim2.fromScale(0, 1), BackgroundColor3 = Theme.Accent, BorderSizePixel = 0, Parent = track }, { Corner(2) })
+
+		task.spawn(function()
+			local steps = { "Initializing...", "Loading components...", "Building interface...", "Ready" }
+			local total = cfg.LoadTime or 1.4
+			local per = total / #steps
+			pcall(function()
+				Tween(splash, { GroupTransparency = 0 }, 0.25)
+				for i, txt in ipairs(steps) do
+					status.Text = txt
+					Tween(fill, { Size = UDim2.fromScale(i / #steps, 1) }, per)
+					task.wait(per)
+				end
+				task.wait(0.15)
+				Tween(splash, { GroupTransparency = 1 }, 0.25)
+				task.wait(0.27)
+				splash:Destroy()
+			end)
+			Window.Loaded = true
+			if gui.Parent then Window:SetVisible(true) end
+		end)
+	else
+		Window:SetVisible(true)
+	end
+
 	local tabOrder = 0
 	function Window:AddCategory(name)
 		tabOrder = tabOrder + 1
@@ -505,7 +598,7 @@ function NeverRage:CreateWindow(cfg)
 		tabOrder = tabOrder + 1
 
 		local btn = New("TextButton", { Size = UDim2.new(1, 0, 0, 26), BackgroundColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 1, Text = "", AutoButtonColor = false, LayoutOrder = tabOrder, Parent = tabList })
-		local ind = New("Frame", { Size = UDim2.fromOffset(3, 14), Position = UDim2.new(0, 0, 0.5, -7), BackgroundColor3 = Theme.Accent, BorderSizePixel = 0, Visible = false, Parent = btn }, { Corner(2) })
+		local ind = New("Frame", { Size = UDim2.fromOffset(3, 14), AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 0, 0.5, 0), BackgroundColor3 = Theme.Accent, BorderSizePixel = 0, Visible = false, Parent = btn }, { Corner(2) })
 		local icon = BuildIcon(tcfg.Icon or "dots", btn, 12, Theme.SubText, 15, 7)
 		local lbl = Label({ Size = UDim2.new(1, -52, 1, 0), Position = UDim2.fromOffset(35, 0), Text = tcfg.Name or "Tab", Font = Theme.FontMed, TextSize = 9, TextColor3 = Theme.SubText, Parent = btn })
 		local chev = Glyph("right", btn, 6, Theme.Accent, SW - 19, 10)
@@ -534,21 +627,28 @@ function NeverRage:CreateWindow(cfg)
 		local colCount = { [left] = 0, [right] = 0 }
 
 		function Tab:_render(on)
+			local was = page.Visible
 			page.Visible = on
+			if on and not was then
+				page.Position = UDim2.fromOffset(0, 8)
+				Tween(page, { Position = UDim2.fromOffset(0, 0) }, 0.2)
+				ind.Size = UDim2.fromOffset(3, 0)
+				Tween(ind, { Size = UDim2.fromOffset(3, 14) }, 0.2)
+			end
 			ind.Visible = on
 			chev.Holder.Visible = on
 			ind.BackgroundColor3 = Theme.Accent
 			chev.SetColor(Theme.Accent)
-			btn.BackgroundTransparency = on and 0.955 or 1
-			lbl.TextColor3 = on and Theme.Accent or Theme.SubText
+			Tween(btn, { BackgroundTransparency = on and 0.955 or 1 }, 0.15)
+			Tween(lbl, { TextColor3 = on and Theme.Accent or Theme.SubText }, 0.15)
 			icon.SetColor(on and Theme.Accent or Theme.SubText)
 		end
 		btn.MouseButton1Click:Connect(function() Window:SelectTab(Tab) end)
 		btn.MouseEnter:Connect(function()
-			if Window.Active ~= Tab then lbl.TextColor3 = Theme.Text; icon.SetColor(Theme.Text) end
+			if Window.Active ~= Tab then Tween(lbl, { TextColor3 = Theme.Text }, 0.12); icon.SetColor(Theme.Text) end
 		end)
 		btn.MouseLeave:Connect(function()
-			if Window.Active ~= Tab then lbl.TextColor3 = Theme.SubText; icon.SetColor(Theme.SubText) end
+			if Window.Active ~= Tab then Tween(lbl, { TextColor3 = Theme.SubText }, 0.12); icon.SetColor(Theme.SubText) end
 		end)
 
 		-- ================================================== sections
@@ -715,7 +815,7 @@ function NeverRage:CreateWindow(cfg)
 				local function setOpen(v)
 					open = v
 					listFrame.Visible = v
-					arrow.Holder.Rotation = v and 180 or 0
+					Tween(arrow.Holder, { Rotation = v and 180 or 0 }, 0.15)
 				end
 				function obj:Refresh(newOptions)
 					options = newOptions or options
