@@ -355,6 +355,7 @@ function NeverRage:CreateWindow(cfg)
 	local btns = New("Frame", { Size = UDim2.fromOffset(78, TH), AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -4, 0, 1), BackgroundTransparency = 1, Parent = titlebar },
 		{ New("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, SortOrder = Enum.SortOrder.LayoutOrder }) })
 	local minimized, maximized = false, false
+	local floatBtn
 	local function winButton(kind, order, hover, fn)
 		local b = New("TextButton", { Size = UDim2.fromOffset(26, TH - 1), BackgroundTransparency = 1, Text = "", AutoButtonColor = false, LayoutOrder = order, Parent = btns })
 		local g = Glyph(kind, b, 8, Theme.SubText, 9, 14)
@@ -403,7 +404,9 @@ function NeverRage:CreateWindow(cfg)
 		maximized = not maximized
 		uiScale.Scale = maximized and math.min(baseScale * 1.25, vp.X * 0.97 / W, vp.Y * 0.97 / H) or baseScale
 	end)
-	winButton("close", 2, Theme.Accent, function() Window:Destroy() end)
+	winButton("close", 2, Theme.Accent, function()
+		if floatBtn then Window:Toggle() else Window:Destroy() end
+	end)
 
 	-- toasts
 	local toasts = New("Frame", { AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -18, 1, -18), Size = UDim2.fromOffset(250, 420), BackgroundTransparency = 1, Parent = gui },
@@ -427,13 +430,50 @@ function NeverRage:CreateWindow(cfg)
 		end)
 	end
 
+	-- floating toggle button (auto-enabled on touch devices; MobileButton=true/false to force)
+	if cfg.MobileButton == true or (cfg.MobileButton == nil and UIS.TouchEnabled) then
+		floatBtn = New("TextButton", {
+			Name = "ToggleButton", Size = UDim2.fromOffset(42, 42), Position = UDim2.new(0, 14, 0.5, -21),
+			BackgroundColor3 = Theme.Element, Text = "", AutoButtonColor = false, ZIndex = 20, Parent = gui,
+		}, { Corner(21) })
+		local fstroke = Stroke(Theme.Accent, 1.5); fstroke.Parent = floatBtn
+		local fletter = Label({
+			Size = UDim2.fromScale(1, 1), Text = cfg.ButtonText or string.sub(cfg.Title or "N", 1, 1), Font = Theme.FontBold,
+			TextSize = 17, TextColor3 = Theme.Accent, TextXAlignment = Enum.TextXAlignment.Center, ZIndex = 21, Parent = floatBtn,
+		})
+		OnAccent(function() fstroke.Color = Theme.Accent; fletter.TextColor3 = Theme.Accent end)
+
+		local fdrag, moved, fstart, fpos = false, false, nil, nil
+		floatBtn.InputBegan:Connect(function(i)
+			if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+				fdrag, moved, fstart, fpos = true, false, i.Position, floatBtn.Position
+			end
+		end)
+		conn(UIS.InputChanged, function(i)
+			if fdrag and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
+				local d = i.Position - fstart
+				if d.Magnitude > 6 then moved = true end
+				if moved then
+					floatBtn.Position = UDim2.new(fpos.X.Scale, fpos.X.Offset + d.X, fpos.Y.Scale, fpos.Y.Offset + d.Y)
+				end
+			end
+		end)
+		conn(UIS.InputEnded, function(i)
+			if fdrag and (i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch) then
+				fdrag = false
+				if not moved then Window:Toggle() end
+			end
+		end)
+	end
+
 	-- menu toggle key
 	conn(UIS.InputBegan, function(i, gp)
 		if gp or NeverRage._listening then return end
-		if i.KeyCode == Window.ToggleKey then gui.Enabled = not gui.Enabled end
+		if i.KeyCode == Window.ToggleKey then Window:Toggle() end
 	end)
 
-	function Window:SetVisible(v) gui.Enabled = v end
+	function Window:SetVisible(v) main.Visible = v end
+	function Window:Toggle() main.Visible = not main.Visible end
 	function Window:SetToggleKey(k) Window.ToggleKey = k end
 	function Window:Destroy()
 		for _, c in ipairs(conns) do c:Disconnect() end
