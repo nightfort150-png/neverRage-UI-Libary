@@ -1,7 +1,7 @@
 --[[
 	NeverRage UI Library  (Roblox / Luau)
 
-	local Window  = NeverRage:CreateWindow({Title="Never", TitleAccent="Rage", Tag="v1.0", Footer="", Accent=Color3, ToggleKey=Enum.KeyCode, Scale=1.3, MobileButton=true, ButtonText=nil, Logo="rbxassetid://...", Loading=true, LoadTime=1.4})
+	local Window  = NeverRage:CreateWindow({Title="Never", TitleAccent="Rage", Tag="v1.0", Footer="", Accent=Color3, ToggleKey=Enum.KeyCode, Scale=1.3, MobileButton=true, ButtonText=nil, Logo="rbxassetid://...", Loading=true, LoadTime=1.4, TintLogo=true, OnClose=function() end})
 	Window:AddCategory("Name")                                  -- small grey heading in the sidebar
 	local Tab     = Window:AddTab({Name="", Icon="crosshair", Description=""})
 	local Section = Tab:AddSection({Name="", Side="Left"|"Right"})
@@ -14,6 +14,19 @@
 	Section:AddTextBox({Name, Flag, Default, Placeholder, Callback})
 	Section:AddButton({Name, Callback})
 	Section:AddLabel("text")   Section:AddSeparator()
+
+	NeverRage:CreateSelector({Title="Never", TitleAccent="Rage", Subtitle="", Default=1,
+		Description="...", Messages={"..."}, LoadTime=6, PanelColor=Color3, Options={
+		{Name="NeverRage Aim", Icon="rbxassetid://...", Callback=function(option) end},   -- Callback runs after the loading screen shatters
+		{Name="Test222", Icon="rbxassetid://...", Message="Coming soon"},                  -- no Callback = shows Message
+	}})   -- darkened picker, side arrows, Launch button -> red side panel + loading messages -> pixel shatter
+
+	NeverRage:CreateLoader({Games={ {Name="Game", PlaceId=123, Icon="rbxassetid://...", Description="", Callback=function(game) end} }})
+	   -- small "NeverRage Uni Loader" window: red/black gradient, 3D search bar, game list (empty state when no games)
+	   -- loader:AddGame({...})  loader:Destroy()
+
+	NeverRage:SetTheme("Aqua"|"Void"|"Crimson"|"Forest")   -- swaps accent color + menu background, saved to NeverRage_Theme.txt
+	NeverRage:GetThemeLabels()  NeverRage.CurrentTheme  NeverRage:OnThemeChanged(fn)
 
 	Every element returns an object with :Set(v) / :Get().
 	NeverRage.Flags[flag]  -> current value      NeverRage.Objects[flag] -> element object
@@ -139,6 +152,7 @@ local function Glyph(kind, parent, size, color, x, y)
 	elseif kind == "down" then seg(1.5, 3.2, 5, 6.8, 1.3); seg(5, 6.8, 8.5, 3.2, 1.3)
 	elseif kind == "up" then seg(1.5, 6.8, 5, 3.2, 1.3); seg(5, 3.2, 8.5, 6.8, 1.3)
 	elseif kind == "right" then seg(3.2, 1.5, 6.8, 5, 1.4); seg(6.8, 5, 3.2, 8.5, 1.4)
+	elseif kind == "left" then seg(6.8, 1.5, 3.2, 5, 1.4); seg(3.2, 5, 6.8, 8.5, 1.4)
 	elseif kind == "close" then seg(1.5, 1.5, 8.5, 8.5, 1.2); seg(8.5, 1.5, 1.5, 8.5, 1.2)
 	elseif kind == "minimize" then seg(1, 5, 9, 5, 1.2)
 	elseif kind == "maximize" then
@@ -255,6 +269,62 @@ function NeverRage:SetAccent(c)
 	for _, fn in ipairs(self._onAccent) do pcall(fn) end
 end
 
+-- ========================================================== background themes (saved between runs)
+NeverRage.Themes = {
+	{ Name = "Aqua",    Label = "Aqua / Blue",    Bg = "rbxassetid://134584196143264", Accent = Color3.fromRGB(46, 168, 255), Panel = Color3.fromRGB(28, 112, 208) },
+	{ Name = "Void",    Label = "Void / Purple",  Bg = "rbxassetid://77153257371501",  Accent = Color3.fromRGB(150, 88, 255), Panel = Color3.fromRGB(106, 48, 196) },
+	{ Name = "Crimson", Label = "Crimson / Red",  Bg = "rbxassetid://124687537766611", Accent = Color3.fromRGB(240, 62, 98),  Panel = Color3.fromRGB(205, 32, 58) },
+	{ Name = "Forest",  Label = "Forest / Green", Bg = "rbxassetid://133368156535759", Accent = Color3.fromRGB(62, 200, 110), Panel = Color3.fromRGB(34, 150, 78) },
+}
+NeverRage._onTheme = {}
+local THEME_FILE = "NeverRage_Theme.txt"
+
+local function findTheme(key)
+	if type(key) ~= "string" then return nil end
+	local k = string.lower((key:gsub("%s+", "")))
+	for _, t in ipairs(NeverRage.Themes) do
+		if string.lower(t.Name) == k or string.lower((t.Label:gsub("%s+", ""))) == k then return t end
+	end
+	return nil
+end
+local function loadSavedTheme()
+	local name
+	pcall(function()
+		if isfile and readfile and isfile(THEME_FILE) then name = readfile(THEME_FILE) end
+	end)
+	if not name then pcall(function() if getgenv then name = getgenv().NeverRage_Theme end end) end
+	return name
+end
+local function saveTheme(name)
+	pcall(function() if writefile then writefile(THEME_FILE, name) end end)
+	pcall(function() if getgenv then getgenv().NeverRage_Theme = name end end)
+end
+
+function NeverRage:GetThemeLabels()
+	local out = {}
+	for _, t in ipairs(self.Themes) do table.insert(out, t.Label) end
+	return out
+end
+function NeverRage:OnThemeChanged(fn) table.insert(self._onTheme, fn) end
+
+-- SetTheme("Aqua" | "Void" | "Crimson" | "Forest")  (the label, e.g. "Aqua / Blue", also works)
+function NeverRage:SetTheme(key, noSave)
+	local t = findTheme(key)
+	if not t then return false end
+	self.CurrentTheme = t
+	self:SetAccent(t.Accent)
+	for _, w in ipairs(self.Windows) do
+		if w._applyBg then w._applyBg(t.Bg, true) end
+	end
+	for _, fn in ipairs(self._onTheme) do pcall(fn, t) end
+	if not noSave then saveTheme(t.Name) end
+	return true
+end
+
+-- load the saved theme (default: Crimson) before any window is built
+NeverRage.CurrentTheme = findTheme(loadSavedTheme()) or findTheme("Crimson")
+Theme.Accent = NeverRage.CurrentTheme.Accent
+
 local function ser(v)
 	local t = typeof(v)
 	if t == "Color3" then return { __color = { v.R, v.G, v.B } } end
@@ -323,6 +393,25 @@ function NeverRage:CreateWindow(cfg)
 	}, { Corner(4), Stroke(Theme.Border) })
 	local uiScale = New("UIScale", { Scale = baseScale, Parent = main })
 
+	-- theme background image (sits behind the semi-transparent panels)
+	local bgImage = New("ImageLabel", {
+		Name = "Background", Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Image = NeverRage.CurrentTheme.Bg,
+		ScaleType = Enum.ScaleType.Crop, ImageTransparency = 0.05, ZIndex = 0, Parent = main,
+	})
+	local function applyBg(id, animate)
+		if animate and bgImage.Image ~= id then
+			Tween(bgImage, { ImageTransparency = 1 }, 0.18)
+			task.delay(0.2, function()
+				if not bgImage.Parent then return end
+				bgImage.Image = id
+				Tween(bgImage, { ImageTransparency = 0.05 }, 0.25)
+			end)
+		else
+			bgImage.Image = id
+		end
+	end
+	Window._applyBg = applyBg
+
 	-- rainbow bar
 	local bar = New("Frame", { Size = UDim2.new(1, 0, 0, 2), BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0, ZIndex = 10, Parent = main })
 	New("UIGradient", {
@@ -338,7 +427,7 @@ function NeverRage:CreateWindow(cfg)
 	})
 
 	-- title bar
-	local titlebar = New("Frame", { Size = UDim2.new(1, 0, 0, TH), BackgroundColor3 = Theme.Sidebar, BorderSizePixel = 0, Parent = main })
+	local titlebar = New("Frame", { Size = UDim2.new(1, 0, 0, TH), BackgroundColor3 = Theme.Sidebar, BackgroundTransparency = 0.15, BorderSizePixel = 0, Parent = main })
 	New("Frame", { Size = UDim2.new(1, 0, 0, 1), Position = UDim2.new(0, 0, 1, -1), BackgroundColor3 = Theme.Line, BorderSizePixel = 0, Parent = titlebar })
 
 	local brand = New("Frame", { Size = UDim2.new(0, 0, 1, 0), AutomaticSize = Enum.AutomaticSize.X, Position = UDim2.fromOffset(13, 1), BackgroundTransparency = 1, Parent = titlebar },
@@ -352,15 +441,15 @@ function NeverRage:CreateWindow(cfg)
 	Label({ Size = UDim2.new(0, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.XY, Text = cfg.Tag or "v1.0", TextSize = 7, TextColor3 = Theme.SubText, Parent = tag })
 
 	-- window buttons
-	local btns = New("Frame", { Size = UDim2.fromOffset(78, TH), AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -4, 0, 1), BackgroundTransparency = 1, Parent = titlebar },
+	local btns = New("Frame", { Size = UDim2.fromOffset(90, TH), AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -4, 0, 1), BackgroundTransparency = 1, Parent = titlebar },
 		{ New("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, SortOrder = Enum.SortOrder.LayoutOrder }) })
 	local minimized, maximized = false, false
 	local floatBtn
 	local bigScale = math.min(baseScale * 1.25, vp.X * 0.97 / W, vp.Y * 0.97 / H)
 	local function curScale() return maximized and bigScale or baseScale end
 	local function winButton(kind, order, hover, fn)
-		local b = New("TextButton", { Size = UDim2.fromOffset(26, TH - 1), BackgroundTransparency = 1, Text = "", AutoButtonColor = false, LayoutOrder = order, Parent = btns })
-		local g = Glyph(kind, b, 8, Theme.SubText, 9, 14)
+		local b = New("TextButton", { Size = UDim2.fromOffset(30, TH - 1), BackgroundTransparency = 1, Text = "", AutoButtonColor = false, LayoutOrder = order, Parent = btns })
+		local g = Glyph(kind, b, 9, Theme.SubText, 10.5, 13.5)
 		b.MouseEnter:Connect(function() g.SetColor(hover) end)
 		b.MouseLeave:Connect(function() g.SetColor(Theme.SubText) end)
 		b.MouseButton1Click:Connect(fn)
@@ -386,7 +475,7 @@ function NeverRage:CreateWindow(cfg)
 	end
 
 	-- sidebar
-	local sidebar = New("Frame", { Size = UDim2.new(0, SW, 1, -TH), Position = UDim2.fromOffset(0, TH), BackgroundColor3 = Theme.Sidebar, BorderSizePixel = 0, Parent = main })
+	local sidebar = New("Frame", { Size = UDim2.new(0, SW, 1, -TH), Position = UDim2.fromOffset(0, TH), BackgroundColor3 = Theme.Sidebar, BackgroundTransparency = 0.15, BorderSizePixel = 0, Parent = main })
 	New("Frame", { Size = UDim2.new(0, 1, 1, 0), Position = UDim2.new(1, -1, 0, 0), BackgroundColor3 = Theme.Line, BorderSizePixel = 0, Parent = sidebar })
 	local tabList = New("ScrollingFrame", {
 		Size = UDim2.new(1, -1, 1, -28), BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 0,
@@ -394,9 +483,10 @@ function NeverRage:CreateWindow(cfg)
 	}, { List(2), Pad(0, 6, 0, 6) })
 	Label({ Size = UDim2.new(1, -20, 0, 20), AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 14, 1, -4), Text = cfg.Footer or "NeverRage UI", TextSize = 7, TextColor3 = Theme.Dim, Parent = sidebar })
 
-	local content = New("Frame", { Size = UDim2.new(1, -SW, 1, -TH), Position = UDim2.fromOffset(SW, TH), BackgroundColor3 = Theme.Content, BorderSizePixel = 0, Parent = main })
+	local content = New("Frame", { Size = UDim2.new(1, -SW, 1, -TH), Position = UDim2.fromOffset(SW, TH), BackgroundColor3 = Theme.Content, BackgroundTransparency = 0.22, BorderSizePixel = 0, Parent = main })
 
 	winButton("minimize", 0, Theme.Text, function()
+		if floatBtn then Window:SetVisible(false) return end
 		minimized = not minimized
 		if minimized then
 			sidebar.Visible = false
@@ -414,7 +504,7 @@ function NeverRage:CreateWindow(cfg)
 		Tween(uiScale, { Scale = curScale() }, 0.2)
 	end)
 	winButton("close", 2, Theme.Accent, function()
-		if floatBtn then Window:Toggle() else Window:Destroy() end
+		Window:Destroy()
 	end)
 
 	-- toasts
@@ -457,10 +547,12 @@ function NeverRage:CreateWindow(cfg)
 			New("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 7), VerticalAlignment = Enum.VerticalAlignment.Center, SortOrder = Enum.SortOrder.LayoutOrder }),
 		})
 		local fstroke = Stroke(Theme.Border, 1.2); fstroke.Parent = floatBtn
-		New("ImageLabel", {
+		local ficon = New("ImageLabel", {
 			Size = UDim2.fromOffset(22, 22), BackgroundTransparency = 1, Image = cfg.Logo or "rbxassetid://127179358842282",
+			ImageColor3 = (cfg.TintLogo == false) and Color3.new(1, 1, 1) or Theme.Accent,
 			ScaleType = Enum.ScaleType.Fit, LayoutOrder = 0, ZIndex = 21, Parent = floatBtn,
 		})
+		OnAccent(function() if cfg.TintLogo ~= false then ficon.ImageColor3 = Theme.Accent end end)
 		local fname = Label({
 			Size = UDim2.new(0, 0, 1, 0), AutomaticSize = Enum.AutomaticSize.X, RichText = true,
 			Text = cfg.ButtonText or titleText(), Font = Theme.FontBold, TextSize = 12, LayoutOrder = 1, ZIndex = 21, Parent = floatBtn,
@@ -518,6 +610,9 @@ function NeverRage:CreateWindow(cfg)
 	end
 	function Window:SetToggleKey(k) Window.ToggleKey = k end
 	function Window:Destroy()
+		if Window._destroyed then return end
+		Window._destroyed = true
+		if cfg.OnClose then pcall(cfg.OnClose) end
 		for _, c in ipairs(conns) do c:Disconnect() end
 		conns = {}
 		gui:Destroy()
@@ -554,7 +649,9 @@ function NeverRage:CreateWindow(cfg)
 		})
 		New("ImageLabel", {
 			AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 16), Size = UDim2.fromOffset(34, 34),
-			BackgroundTransparency = 1, Image = cfg.Logo or "rbxassetid://127179358842282", ScaleType = Enum.ScaleType.Fit, Parent = splash,
+			BackgroundTransparency = 1, Image = cfg.Logo or "rbxassetid://127179358842282",
+			ImageColor3 = (cfg.TintLogo == false) and Color3.new(1, 1, 1) or Theme.Accent,
+			ScaleType = Enum.ScaleType.Fit, Parent = splash,
 		})
 		local stitle = Label({ Size = UDim2.new(1, 0, 0, 18), Position = UDim2.fromOffset(0, 56), RichText = true, Text = titleText(), Font = Theme.FontBold, TextSize = 15, TextXAlignment = Enum.TextXAlignment.Center, Parent = splash })
 		local status = Label({ Size = UDim2.new(1, 0, 0, 12), Position = UDim2.fromOffset(0, 78), Text = "", TextSize = 8, TextColor3 = Theme.SubText, TextXAlignment = Enum.TextXAlignment.Center, Parent = splash })
@@ -1078,6 +1175,500 @@ function NeverRage:CreateWindow(cfg)
 
 	table.insert(NeverRage.Windows, Window)
 	return Window
+end
+
+-- ========================================================== selector (launch menu)
+function NeverRage:CreateSelector(cfg)
+	cfg = cfg or {}
+	local options = cfg.Options or {}
+	local n = #options
+	local index = math.clamp(cfg.Default or 1, 1, math.max(n, 1))
+	local closing = false
+	local token = 0
+	local conns = {}
+	local logoId = cfg.Logo or "rbxassetid://127179358842282"
+
+	local cam = workspace.CurrentCamera
+	local vp = cam and cam.ViewportSize or Vector2.new(1280, 720)
+	local sc = math.min(1.25, vp.X * 0.86 / 560, vp.Y * 0.9 / 300)
+	local function u(x) return math.floor(x * sc + 0.5) end
+
+	local gui = New("ScreenGui", { Name = "NeverRage_Selector", ResetOnSpawn = false, ZIndexBehavior = Enum.ZIndexBehavior.Sibling, IgnoreGuiInset = true, DisplayOrder = 200 })
+	Mount(gui)
+
+	-- darkened background (also blocks clicks to the game behind it)
+	local dim = New("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 1, BorderSizePixel = 0, Active = true, Parent = gui })
+	Tween(dim, { BackgroundTransparency = 0.35 }, 0.35)
+
+	local groups = {}
+	local function titleText()
+		return (cfg.Title or "Never") .. "<font color=\"" .. Hex(Theme.Accent) .. "\">" .. (cfg.TitleAccent or "Rage") .. "</font>"
+	end
+
+	local center = New("CanvasGroup", {
+		AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromOffset(math.max(u(560), n * u(240) + u(80)), u(300)), BackgroundTransparency = 1, GroupTransparency = 1, Parent = dim,
+	})
+	groups[#groups + 1] = center
+	local title = Label({ Size = UDim2.new(1, 0, 0, u(22)), Position = UDim2.fromOffset(0, u(6)), RichText = true, Text = titleText(), Font = Theme.FontBold, TextSize = u(17), TextXAlignment = Enum.TextXAlignment.Center, Parent = center })
+	Label({ Size = UDim2.new(1, 0, 0, u(14)), Position = UDim2.fromOffset(0, u(30)), Text = cfg.Subtitle or "Select an option", TextSize = u(9), TextColor3 = Theme.SubText, TextXAlignment = Enum.TextXAlignment.Center, Parent = center })
+	local hint = "Select an option, then press Launch"
+	local status = Label({ Size = UDim2.new(1, 0, 0, u(14)), Position = UDim2.fromOffset(0, u(272)), Text = hint, TextSize = u(9), TextColor3 = Theme.Dim, TextXAlignment = Enum.TextXAlignment.Center, Parent = center })
+
+	local function setStatus(text)
+		token = token + 1
+		local my = token
+		status.Text = text
+		status.TextColor3 = Theme.Accent
+		task.delay(1.8, function()
+			if my == token and status.Parent then status.Text = hint; status.TextColor3 = Theme.Dim end
+		end)
+	end
+
+	local cards = {}
+	local lglyph, rglyph
+
+	local function refresh()
+		local info = TweenInfo.new(0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+		for i, c in ipairs(cards) do
+			local on = (i == index)
+			TweenService:Create(c.scale, info, { Scale = on and 1.18 or 0.88 }):Play()
+			Tween(c.img, { ImageTransparency = on and 0 or 0.55 }, 0.22)
+			Tween(c.label, { TextColor3 = on and Theme.Accent or Theme.SubText }, 0.22)
+			Tween(c.bar, { Size = UDim2.fromOffset(on and u(26) or 0, u(2)), BackgroundColor3 = Theme.Accent }, 0.22)
+		end
+		if lglyph then lglyph.SetColor(index > 1 and Theme.Text or Theme.Dim) end
+		if rglyph then rglyph.SetColor(index < n and Theme.Text or Theme.Dim) end
+	end
+
+	local function select(i)
+		if closing or n == 0 then return end
+		i = math.clamp(i, 1, n)
+		if i == index then return end
+		index = i
+		refresh()
+	end
+
+	-- plain close (no loading sequence)
+	local function close()
+		if closing then return end
+		closing = true
+		for _, c in ipairs(conns) do c:Disconnect() end
+		Tween(dim, { BackgroundTransparency = 1 }, 0.3)
+		for _, g in ipairs(groups) do Tween(g, { GroupTransparency = 1 }, 0.25) end
+		task.delay(0.32, function() gui:Destroy() end)
+	end
+
+	-- ------------------------------------------------ loading sequence + pixel shatter
+	local function runLoading(o)
+		local total = cfg.LoadTime or 6
+		local panelFrac = 0.4
+		local red = cfg.PanelColor or NeverRage.CurrentTheme.Panel
+		local bg = Color3.fromRGB(10, 10, 13)
+		local gradEnd = Color3.new(0, 0, 0)
+
+		-- selector fades out, screen goes dark
+		dim.BackgroundColor3 = bg
+		Tween(dim, { BackgroundTransparency = 0 }, 0.4)
+		for _, g in ipairs(groups) do Tween(g, { GroupTransparency = 1 }, 0.25) end
+		task.wait(0.45)
+		for _, g in ipairs(groups) do g.Visible = false end
+
+		-- red side panel
+		local panel = New("Frame", { Size = UDim2.new(panelFrac, 0, 1, 0), Position = UDim2.new(-panelFrac, 0, 0, 0), BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0, Parent = dim })
+		New("UIGradient", { Rotation = 90, Color = ColorSequence.new(red, red:Lerp(gradEnd, 0.35)), Parent = panel })
+		New("Frame", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.fromScale(1, 0), Size = UDim2.new(0, 3, 1, 0), BackgroundColor3 = red:Lerp(Color3.new(1, 1, 1), 0.25), BorderSizePixel = 0, Parent = panel })
+
+		local lc = New("CanvasGroup", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Parent = panel })
+		local inner = New("Frame", { AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, u(34), 0.5, 0), Size = UDim2.new(1, -u(64), 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, Parent = lc }, { List(u(12)) })
+		New("ImageLabel", { Size = UDim2.fromOffset(u(72), u(72)), BackgroundTransparency = 1, Image = logoId, ScaleType = Enum.ScaleType.Fit, LayoutOrder = 0, Parent = inner })
+		Label({ Size = UDim2.new(1, 0, 0, u(34)), RichText = true, Text = (cfg.Title or "Never") .. "<font color=\"#FFD2DA\">" .. (cfg.TitleAccent or "Rage") .. "</font>", Font = Theme.FontBold, TextSize = u(30), LayoutOrder = 1, Parent = inner })
+		New("Frame", { Size = UDim2.fromOffset(u(36), u(3)), BackgroundColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 0.2, BorderSizePixel = 0, LayoutOrder = 2, Parent = inner }, { Corner(2) })
+		Label({
+			Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, TextWrapped = true, TextYAlignment = Enum.TextYAlignment.Top, LayoutOrder = 3,
+			Text = cfg.Description or "NeverRage is a lightweight, customizable UI library and script hub for Roblox. Clean menus, smooth animations and powerful controls, built to be simple to use and easy to extend.",
+			TextSize = u(11), TextColor3 = Color3.fromRGB(255, 232, 236), Parent = inner,
+		})
+
+		-- right side: Loading + rotating messages
+		local rc = New("CanvasGroup", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(panelFrac + (1 - panelFrac) / 2, 0, 0.5, 0), Size = UDim2.fromOffset(u(440), u(130)), BackgroundTransparency = 1, GroupTransparency = 1, Parent = dim })
+		local row = New("Frame", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, u(14)), Size = UDim2.new(0, 0, 0, u(34)), AutomaticSize = Enum.AutomaticSize.X, BackgroundTransparency = 1, Parent = rc },
+			{ New("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, u(1)), SortOrder = Enum.SortOrder.LayoutOrder }) })
+		Label({ Size = UDim2.new(0, 0, 1, 0), AutomaticSize = Enum.AutomaticSize.X, Text = "Loading", Font = Theme.FontBold, TextSize = u(26), LayoutOrder = 0, Parent = row })
+		local dots = {}
+		for d = 1, 3 do
+			dots[d] = Label({ Size = UDim2.new(0, 0, 1, 0), AutomaticSize = Enum.AutomaticSize.X, Text = ".", Font = Theme.FontBold, TextSize = u(26), TextTransparency = 0.85, LayoutOrder = d, Parent = row })
+		end
+		local msgLabel = Label({
+			Size = UDim2.new(1, 0, 0, u(44)), Position = UDim2.fromOffset(0, u(64)), TextWrapped = true, Text = "", TextSize = u(12),
+			TextColor3 = Color3.fromRGB(175, 175, 186), TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Top, TextTransparency = 1, Parent = rc,
+		})
+
+		Tween(panel, { Position = UDim2.fromScale(0, 0) }, 0.6)
+		task.wait(0.4)
+		Tween(rc, { GroupTransparency = 0 }, 0.4)
+
+		local alive = true
+		task.spawn(function()
+			local k = 0
+			while alive and gui.Parent do
+				k = (k + 1) % 4
+				for d = 1, 3 do Tween(dots[d], { TextTransparency = (d <= k) and 0 or 0.85 }, 0.12) end
+				task.wait(0.35)
+			end
+		end)
+
+		local msgs = cfg.Messages or {
+			"Believe in the process. Every great build starts small.",
+			"Thank you for supporting NeverRage. It means a lot.",
+			"Stay curious. Keep creating.",
+			"Small steps every day lead to big results.",
+			"You've got this. Almost there.",
+			"Your support keeps NeverRage getting better.",
+		}
+		local count = math.max(2, math.floor(total / 2.1 + 0.5))
+		local startAt = math.random(1, #msgs)
+		for m = 1, count do
+			msgLabel.Text = msgs[(startAt + m - 2) % #msgs + 1]
+			Tween(msgLabel, { TextTransparency = 0 }, 0.35)
+			task.wait(1.35)
+			Tween(msgLabel, { TextTransparency = 1 }, 0.35)
+			task.wait(0.4)
+		end
+		alive = false
+
+		-- content fades, then the whole screen shatters into pixels
+		Tween(rc, { GroupTransparency = 1 }, 0.2)
+		Tween(lc, { GroupTransparency = 1 }, 0.2)
+		task.wait(0.25)
+
+		local v = gui.AbsoluteSize
+		if v.X < 100 or v.Y < 100 then v = vp end
+		local cs = math.max(30, math.floor(v.X / 26))
+		local cols, rows = math.ceil(v.X / cs), math.ceil(v.Y / cs)
+		local panelW = v.X * panelFrac
+		local shards = New("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 10, Parent = gui })
+		local pending = {}
+		for gx = 0, cols - 1 do
+			for gy = 0, rows - 1 do
+				local px, py = gx * cs + cs / 2, gy * cs + cs / 2
+				local base
+				if px < panelW then base = red:Lerp(gradEnd, 0.35 * (py / v.Y)) else base = bg end
+				local j = (math.random() - 0.5) * 0.06
+				local col = Color3.new(math.clamp(base.R + j, 0, 1), math.clamp(base.G + j, 0, 1), math.clamp(base.B + j, 0, 1))
+				local f = New("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset(px, py), Size = UDim2.fromOffset(cs + 1, cs + 1), BackgroundColor3 = col, BorderSizePixel = 0, Parent = shards })
+				pending[#pending + 1] = { f = f, px = px, py = py }
+			end
+		end
+		-- shards now cover the screen, so swap out the real panels instantly
+		panel.Visible = false
+		rc.Visible = false
+		dim.BackgroundTransparency = 1
+
+		-- load whatever was selected while the pixels fall away
+		task.spawn(function()
+			local ok, err = pcall(o.Callback, o)
+			if not ok then warn("[NeverRage] selector callback error: " .. tostring(err)) end
+		end)
+
+		for _, sh in ipairs(pending) do
+			local dx = (math.random() - 0.5) * cs * 3 + (sh.px - v.X / 2) * 0.12
+			local dy = cs * (1.5 + math.random() * 5)
+			local rot = (math.random() - 0.5) * 360
+			local dur = 0.7 + math.random() * 0.6
+			local delay = (sh.px / v.X) * 0.45 + math.random() * 0.15
+			task.delay(delay, function()
+				if not sh.f.Parent then return end
+				TweenService:Create(sh.f, TweenInfo.new(dur, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+					Position = UDim2.fromOffset(sh.px + dx, sh.py + dy), Rotation = rot, BackgroundTransparency = 1,
+					Size = UDim2.fromOffset(cs * 0.35, cs * 0.35),
+				}):Play()
+			end)
+		end
+		task.wait(2.2)
+		gui:Destroy()
+	end
+
+	local function launch()
+		if closing or n == 0 then return end
+		local o = options[index]
+		if not o then return end
+		if not o.Callback then setStatus(o.Message or "Coming soon") return end
+		closing = true
+		for _, c in ipairs(conns) do c:Disconnect() end
+		task.spawn(function()
+			local ok, err = pcall(runLoading, o)
+			if not ok then
+				warn("[NeverRage] launch sequence error: " .. tostring(err))
+				if gui.Parent then gui:Destroy() end
+				pcall(o.Callback, o)
+			end
+		end)
+	end
+
+	-- icon cards (no background square, just the icon + name)
+	for i, o in ipairs(options) do
+		local x = (i - (n + 1) / 2) * u(240)
+		local card = New("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, x, 0, u(128)), Size = UDim2.fromOffset(u(150), u(136)), BackgroundTransparency = 1, Parent = center })
+		local cscale = New("UIScale", { Scale = 0.6, Parent = card })
+		local img = New("ImageLabel", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 0), Size = UDim2.fromOffset(u(104), u(104)), BackgroundTransparency = 1, Image = o.Icon or "", ImageTransparency = 0.55, ScaleType = Enum.ScaleType.Fit, Parent = card })
+		local lbl = Label({ Size = UDim2.new(1, 0, 0, u(18)), Position = UDim2.fromOffset(0, u(108)), Text = o.Name or ("Option " .. i), Font = Theme.FontBold, TextSize = u(13), TextColor3 = Theme.SubText, TextXAlignment = Enum.TextXAlignment.Center, Parent = card })
+		local bar = New("Frame", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, u(130)), Size = UDim2.fromOffset(0, u(2)), BackgroundColor3 = Theme.Accent, BorderSizePixel = 0, Parent = card }, { Corner(1) })
+		local hit = New("TextButton", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "", AutoButtonColor = false, ZIndex = 5, Parent = card })
+		hit.MouseEnter:Connect(function() select(i) end)
+		hit.MouseButton1Click:Connect(function() select(i) end)
+		cards[i] = { scale = cscale, img = img, label = lbl, bar = bar }
+	end
+
+	-- launch button
+	local launchBtn = New("TextButton", {
+		AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, u(228)), Size = UDim2.fromOffset(u(150), u(34)),
+		BackgroundColor3 = Theme.Accent, Text = "Launch", Font = Theme.FontBold, TextSize = u(13), TextColor3 = Color3.new(1, 1, 1), AutoButtonColor = false, Parent = center,
+	}, { Corner(u(17)) })
+	local lscale = New("UIScale", { Scale = 1, Parent = launchBtn })
+	launchBtn.MouseEnter:Connect(function() Tween(launchBtn, { BackgroundColor3 = Theme.Accent:Lerp(Color3.new(1, 1, 1), 0.15) }) end)
+	launchBtn.MouseLeave:Connect(function() Tween(launchBtn, { BackgroundColor3 = Theme.Accent }); Tween(lscale, { Scale = 1 }, 0.1) end)
+	launchBtn.MouseButton1Down:Connect(function() Tween(lscale, { Scale = 0.95 }, 0.08) end)
+	launchBtn.MouseButton1Up:Connect(function() Tween(lscale, { Scale = 1 }, 0.1) end)
+	launchBtn.MouseButton1Click:Connect(launch)
+
+	-- side arrows
+	local function arrow(side)
+		local wrap = New("CanvasGroup", {
+			AnchorPoint = Vector2.new(side == "left" and 0 or 1, 0.5),
+			Position = UDim2.new(side == "left" and 0 or 1, side == "left" and u(22) or -u(22), 0.5, 0),
+			Size = UDim2.fromOffset(u(44), u(44)), BackgroundColor3 = Theme.Element, BackgroundTransparency = 0.15, BorderSizePixel = 0, GroupTransparency = 1, Parent = dim,
+		}, { Corner(u(22)) })
+		local st = Stroke(Theme.Border, 1.2); st.Parent = wrap
+		local g = Glyph(side, wrap, u(14), Theme.Text, u(15), u(15))
+		local b = New("TextButton", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "", AutoButtonColor = false, ZIndex = 5, Parent = wrap })
+		b.MouseEnter:Connect(function() Tween(st, { Color = Theme.Accent }) end)
+		b.MouseLeave:Connect(function() Tween(st, { Color = Theme.Border }) end)
+		groups[#groups + 1] = wrap
+		return b, g
+	end
+	local lb, rb
+	lb, lglyph = arrow("left")
+	rb, rglyph = arrow("right")
+	lb.MouseButton1Click:Connect(function() select(index - 1) end)
+	rb.MouseButton1Click:Connect(function() select(index + 1) end)
+
+	-- keyboard
+	conns[#conns + 1] = UIS.InputBegan:Connect(function(i)
+		if i.KeyCode == Enum.KeyCode.Left or i.KeyCode == Enum.KeyCode.A then select(index - 1)
+		elseif i.KeyCode == Enum.KeyCode.Right or i.KeyCode == Enum.KeyCode.D then select(index + 1)
+		elseif i.KeyCode == Enum.KeyCode.Return or i.KeyCode == Enum.KeyCode.KeypadEnter then launch() end
+	end)
+
+	OnAccent(function()
+		if title.Parent then
+			title.Text = titleText()
+			launchBtn.BackgroundColor3 = Theme.Accent
+			refresh()
+		end
+	end)
+
+	for _, g in ipairs(groups) do Tween(g, { GroupTransparency = 0 }, 0.35) end
+	refresh()
+
+	return { Gui = gui, Select = select, Launch = launch, Close = close }
+end
+
+-- ========================================================== universal loader window
+function NeverRage:CreateLoader(cfg)
+	cfg = cfg or {}
+	local W, H, TH = 360, 300, 34
+	local games = {}
+	for _, g in ipairs(cfg.Games or {}) do table.insert(games, g) end
+	local Loader = {}
+	local conns = {}
+	local function conn(sig, fn) conns[#conns + 1] = sig:Connect(fn) end
+	local logoId = cfg.Logo or "rbxassetid://127179358842282"
+	local red = cfg.Red or NeverRage.CurrentTheme.Panel
+	local dimCol, lightCol = Color3.fromRGB(150, 150, 160), Color3.fromRGB(255, 170, 184)
+
+	local gui = New("ScreenGui", { Name = "NeverRage_Loader", ResetOnSpawn = false, ZIndexBehavior = Enum.ZIndexBehavior.Sibling, IgnoreGuiInset = true, DisplayOrder = 100 })
+	Mount(gui)
+
+	local cam = workspace.CurrentCamera
+	local vp = cam and cam.ViewportSize or Vector2.new(1280, 720)
+	local scale = math.min(cfg.Scale or 1.3, vp.X * 0.92 / W, vp.Y * 0.92 / H)
+
+	local main = New("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(W, H),
+		BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0, ClipsDescendants = true, Parent = gui,
+	}, { Corner(8) })
+	local mstroke = Stroke(red:Lerp(Color3.new(0, 0, 0), 0.4), 1.5); mstroke.Parent = main
+	local uiScale = New("UIScale", { Scale = scale * 0.92, Parent = main })
+	Tween(uiScale, { Scale = scale }, 0.22)
+	-- themed color-to-black gradient background (red by default)
+	local grad = New("UIGradient", { Rotation = 115, Parent = main })
+	local function applyGrad()
+		grad.Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, red:Lerp(Color3.new(0, 0, 0), 0.05)),
+			ColorSequenceKeypoint.new(0.5, red:Lerp(Color3.new(0, 0, 0), 0.77)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(8, 8, 10)),
+		})
+	end
+	applyGrad()
+
+	-- title bar
+	local titlebar = New("Frame", { Size = UDim2.new(1, 0, 0, TH), BackgroundTransparency = 1, Parent = main })
+	New("Frame", { Size = UDim2.new(1, 0, 0, 1), Position = UDim2.new(0, 0, 1, -1), BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 0.6, BorderSizePixel = 0, Parent = titlebar })
+	New("ImageLabel", { Size = UDim2.fromOffset(20, 20), Position = UDim2.fromOffset(12, 7), BackgroundTransparency = 1, Image = logoId, ScaleType = Enum.ScaleType.Fit, Parent = titlebar })
+	Label({ Size = UDim2.new(1, -110, 1, 0), Position = UDim2.fromOffset(38, 0), RichText = true, Text = "Never<font color=\"#FF9FB0\">Rage</font> Uni Loader", Font = Theme.FontBold, TextSize = 12, Parent = titlebar })
+
+	local body = New("Frame", { Size = UDim2.new(1, 0, 1, -TH), Position = UDim2.fromOffset(0, TH), BackgroundTransparency = 1, Parent = main })
+	local collapsed = false
+
+	local btns = New("Frame", { Size = UDim2.fromOffset(64, TH), AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -4, 0, 0), BackgroundTransparency = 1, Parent = titlebar },
+		{ New("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, SortOrder = Enum.SortOrder.LayoutOrder }) })
+	local function winButton(kind, order, hover, fn)
+		local b = New("TextButton", { Size = UDim2.fromOffset(32, TH), BackgroundTransparency = 1, Text = "", AutoButtonColor = false, LayoutOrder = order, Parent = btns })
+		local g = Glyph(kind, b, 9, Color3.fromRGB(230, 200, 206), 11.5, 12.5)
+		b.MouseEnter:Connect(function() g.SetColor(hover) end)
+		b.MouseLeave:Connect(function() g.SetColor(Color3.fromRGB(230, 200, 206)) end)
+		b.MouseButton1Click:Connect(fn)
+	end
+	winButton("minimize", 0, Color3.new(1, 1, 1), function()
+		collapsed = not collapsed
+		if collapsed then
+			body.Visible = false
+			Tween(main, { Size = UDim2.fromOffset(W, TH) }, 0.16)
+		else
+			Tween(main, { Size = UDim2.fromOffset(W, H) }, 0.16)
+			task.delay(0.12, function() if not collapsed then body.Visible = true end end)
+		end
+	end)
+	winButton("close", 1, Color3.fromRGB(255, 120, 140), function() Loader:Destroy() end)
+
+	-- dragging
+	do
+		local dragging, start, startPos
+		titlebar.InputBegan:Connect(function(i)
+			if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+				dragging, start, startPos = true, i.Position, main.Position
+			end
+		end)
+		conn(UIS.InputChanged, function(i)
+			if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
+				local d = i.Position - start
+				main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X, startPos.Y.Scale, startPos.Y.Offset + d.Y)
+			end
+		end)
+		conn(UIS.InputEnded, function(i)
+			if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then dragging = false end
+		end)
+	end
+
+	-- ---------------------------------------------- 3D search bar
+	local barH = 34
+	New("Frame", { Position = UDim2.fromOffset(14, 16), Size = UDim2.new(1, -28, 0, barH), BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 0.45, BorderSizePixel = 0, Parent = body }, { Corner(11) })
+	local rim = New("Frame", { Position = UDim2.fromOffset(14, 12), Size = UDim2.new(1, -28, 0, barH), BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0, Parent = body }, { Corner(11) })
+	New("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(10, 10, 12), Color3.fromRGB(128, 100, 108)), Parent = rim })
+	local rimStroke = Stroke(Color3.fromRGB(30, 6, 10), 1); rimStroke.Parent = rim
+	local field = New("Frame", { Position = UDim2.fromOffset(2, 2), Size = UDim2.new(1, -4, 1, -5), BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0, Parent = rim }, { Corner(9) })
+	New("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(11, 11, 14), Color3.fromRGB(30, 28, 36)), Parent = field })
+	local innerShadow = New("Frame", { Size = UDim2.new(1, 0, 0, 9), BackgroundColor3 = Color3.new(0, 0, 0), BorderSizePixel = 0, Parent = field }, { Corner(5) })
+	New("UIGradient", { Rotation = 90, Transparency = NumberSequence.new(0.3, 1), Parent = innerShadow })
+
+	local mag = New("Frame", { Size = UDim2.fromOffset(16, 16), Position = UDim2.new(0, 11, 0.5, -8), BackgroundTransparency = 1, Parent = field })
+	local ring = New("Frame", { Size = UDim2.fromOffset(10, 10), Position = UDim2.fromOffset(1, 1), BackgroundTransparency = 1, Parent = mag }, { Corner(5) })
+	local ringStroke = New("UIStroke", { Color = dimCol, Thickness = 1.6, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = ring })
+	local handle = Seg(mag, 9.6, 9.6, 14, 14, 1.8, dimCol)
+
+	local box = New("TextBox", {
+		Position = UDim2.fromOffset(34, 0), Size = UDim2.new(1, -62, 1, 0), BackgroundTransparency = 1, Text = "", PlaceholderText = "Search games...",
+		PlaceholderColor3 = Color3.fromRGB(110, 110, 120), Font = Theme.Font, TextSize = 11, TextColor3 = Theme.Text, TextXAlignment = Enum.TextXAlignment.Left,
+		ClearTextOnFocus = false, Parent = field,
+	})
+	local clearBtn = New("TextButton", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -6, 0.5, 0), Size = UDim2.fromOffset(22, 22), BackgroundTransparency = 1, Text = "", AutoButtonColor = false, Visible = false, Parent = field })
+	local cg = Glyph("close", clearBtn, 7, dimCol, 7.5, 7.5)
+	clearBtn.MouseEnter:Connect(function() cg.SetColor(Color3.new(1, 1, 1)) end)
+	clearBtn.MouseLeave:Connect(function() cg.SetColor(dimCol) end)
+	clearBtn.MouseButton1Click:Connect(function() box.Text = "" end)
+	box.Focused:Connect(function()
+		Tween(rimStroke, { Color = red }, 0.15)
+		ringStroke.Color = lightCol; handle.BackgroundColor3 = lightCol
+	end)
+	box.FocusLost:Connect(function()
+		Tween(rimStroke, { Color = Color3.fromRGB(30, 6, 10) }, 0.15)
+		ringStroke.Color = dimCol; handle.BackgroundColor3 = dimCol
+	end)
+
+	-- ---------------------------------------------- list / empty state
+	Label({ Size = UDim2.new(0.6, 0, 0, 12), Position = UDim2.fromOffset(16, 60), Text = "AVAILABLE GAMES", Font = Theme.FontBold, TextSize = 8, TextColor3 = Color3.fromRGB(255, 190, 200), Parent = body })
+	local countLabel = Label({ Size = UDim2.new(0.4, -16, 0, 12), Position = UDim2.new(0.6, 0, 0, 60), Text = "", TextSize = 8, TextColor3 = Color3.fromRGB(230, 170, 180), TextXAlignment = Enum.TextXAlignment.Right, Parent = body })
+
+	local list = New("ScrollingFrame", {
+		Position = UDim2.fromOffset(14, 78), Size = UDim2.new(1, -28, 1, -108), BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 3,
+		ScrollBarImageColor3 = Color3.fromRGB(255, 120, 140), CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.Y, Parent = body,
+	}, { List(6) })
+
+	local empty = New("Frame", { Position = UDim2.fromOffset(14, 78), Size = UDim2.new(1, -28, 1, -108), BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 0.6, BorderSizePixel = 0, Parent = body }, { Corner(8) })
+	local est = Stroke(Color3.new(1, 1, 1), 1); est.Transparency = 0.88; est.Parent = empty
+	local emptyTitle = Label({ AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0.5, -10), Size = UDim2.new(1, -20, 0, 18), Text = "", Font = Theme.FontBold, TextSize = 13, TextColor3 = Color3.fromRGB(255, 214, 220), TextXAlignment = Enum.TextXAlignment.Center, Parent = empty })
+	local emptySub = Label({ AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0.5, 14), Size = UDim2.new(1, -30, 0, 28), Text = "", TextSize = 9, TextColor3 = Color3.fromRGB(190, 150, 158), TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Center, TextYAlignment = Enum.TextYAlignment.Top, Parent = empty })
+
+	Label({ Size = UDim2.new(1, -28, 0, 14), AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 16, 1, -8), Text = cfg.Footer or "NeverRage Universal Loader", TextSize = 8, TextColor3 = Color3.fromRGB(200, 150, 160), Parent = body })
+
+	local function refresh()
+		local q = string.lower(box.Text or "")
+		for _, ch in ipairs(list:GetChildren()) do
+			if ch:IsA("Frame") then ch:Destroy() end
+		end
+		local shown = 0
+		for i, g in ipairs(games) do
+			if q == "" or string.find(string.lower(g.Name or ""), q, 1, true) then
+				shown = shown + 1
+				local row = New("Frame", { Size = UDim2.new(1, 0, 0, 46), BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 0.4, BorderSizePixel = 0, LayoutOrder = i, Parent = list }, { Corner(7) })
+				local rst = Stroke(Color3.new(1, 1, 1), 1); rst.Transparency = 0.9; rst.Parent = row
+				New("ImageLabel", { Size = UDim2.fromOffset(30, 30), Position = UDim2.fromOffset(8, 8), BackgroundTransparency = 1, Image = g.Icon or logoId, ScaleType = Enum.ScaleType.Fit, Parent = row }, { Corner(6) })
+				Label({ Size = UDim2.new(1, -130, 0, 14), Position = UDim2.fromOffset(46, 8), Text = g.Name or "Game", Font = Theme.FontBold, TextSize = 11, TextTruncate = Enum.TextTruncate.AtEnd, Parent = row })
+				Label({ Size = UDim2.new(1, -130, 0, 12), Position = UDim2.fromOffset(46, 24), Text = g.Description or (g.PlaceId and ("Place " .. tostring(g.PlaceId)) or "Universal"), TextSize = 8, TextColor3 = Color3.fromRGB(215, 170, 178), TextTruncate = Enum.TextTruncate.AtEnd, Parent = row })
+				local lb = New("TextButton", { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0), Size = UDim2.fromOffset(62, 24), BackgroundColor3 = red, Text = "Load", Font = Theme.FontBold, TextSize = 10, TextColor3 = Color3.new(1, 1, 1), AutoButtonColor = false, Parent = row }, { Corner(12) })
+				lb.MouseEnter:Connect(function() Tween(lb, { BackgroundColor3 = red:Lerp(Color3.new(1, 1, 1), 0.18) }) end)
+				lb.MouseLeave:Connect(function() Tween(lb, { BackgroundColor3 = red }) end)
+				lb.MouseButton1Click:Connect(function()
+					if g.Callback then task.spawn(g.Callback, g) end
+				end)
+			end
+		end
+		empty.Visible = (shown == 0)
+		if #games == 0 then
+			emptyTitle.Text = "No games available yet"
+			emptySub.Text = "Supported games will show up here once they're added."
+		else
+			emptyTitle.Text = "No results found"
+			emptySub.Text = "Nothing matches \"" .. (box.Text or "") .. "\"."
+		end
+		countLabel.Text = shown .. " of " .. #games
+	end
+
+	box:GetPropertyChangedSignal("Text"):Connect(function()
+		clearBtn.Visible = (box.Text ~= "")
+		refresh()
+	end)
+
+	function Loader:AddGame(g) table.insert(games, g); refresh() end
+	function Loader:Refresh() refresh() end
+	function Loader:Destroy()
+		for _, c in ipairs(conns) do c:Disconnect() end
+		conns = {}
+		gui:Destroy()
+	end
+
+	NeverRage:OnThemeChanged(function(t)
+		if not gui.Parent then return end
+		red = cfg.Red or t.Panel
+		applyGrad()
+		mstroke.Color = red:Lerp(Color3.new(0, 0, 0), 0.4)
+		refresh()
+	end)
+
+	Loader.Gui = gui
+	refresh()
+	return Loader
 end
 
 return NeverRage
